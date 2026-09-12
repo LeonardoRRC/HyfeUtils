@@ -140,8 +140,8 @@ hyfe.commands().bind("saludar", (sender, command, label, args) -> {
 
 ## JitPack
 
-Después de publicar el repositorio en GitHub, reemplaza `TU_USUARIO` por el
-usuario u organización propietarios del repositorio:
+El repositorio público está disponible en
+`https://github.com/LeonardoRRC/HyfeUtils`.
 
 ```xml
 <repository>
@@ -152,7 +152,7 @@ usuario u organización propietarios del repositorio:
 
 ```xml
 <dependency>
-    <groupId>com.github.TU_USUARIO</groupId>
+    <groupId>com.github.LeonardoRRC</groupId>
     <artifactId>HyfeUtils</artifactId>
     <version>1.0.0</version>
 </dependency>
