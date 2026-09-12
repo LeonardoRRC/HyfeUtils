@@ -154,11 +154,11 @@ El repositorio público está disponible en
 <dependency>
     <groupId>com.github.LeonardoRRC</groupId>
     <artifactId>HyfeUtils</artifactId>
-    <version>1.0.0</version>
+    <version>1.0.1</version>
 </dependency>
 ```
 
-También puede usarse una etiqueta concreta, por ejemplo `1.0.0`, para evitar
+También puede usarse una etiqueta concreta, por ejemplo `1.0.1`, para evitar
 que una compilación futura cambie el comportamiento de un plugin existente.
 
 ## Maven y shading
@@ -171,7 +171,7 @@ plugins:
 <dependency>
     <groupId>com.hyfecraft</groupId>
     <artifactId>hyfe-utils</artifactId>
-    <version>1.0.0</version>
+    <version>1.0.1</version>
 </dependency>
 ```
 
