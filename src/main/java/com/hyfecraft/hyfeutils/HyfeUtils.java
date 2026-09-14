@@ -5,6 +5,7 @@ import com.hyfecraft.hyfeutils.config.ConfigurationService;
 import com.hyfecraft.hyfeutils.event.EventService;
 import com.hyfecraft.hyfeutils.message.AnimatedTitleService;
 import com.hyfecraft.hyfeutils.message.ActionBarService;
+import com.hyfecraft.hyfeutils.message.BossBarService;
 import com.hyfecraft.hyfeutils.message.ChatService;
 import com.hyfecraft.hyfeutils.message.MessageService;
 import com.hyfecraft.hyfeutils.message.TitleService;
@@ -27,6 +28,7 @@ public final class HyfeUtils implements AutoCloseable {
     private final AnimatedTitleService animatedTitles;
     private final ChatService chat;
     private final ClickableTextService clickableText;
+    private final BossBarService bossBar;
     private final SchedulerService scheduler;
     private final EventService events;
     private final ConfigurationService configuration;
@@ -43,6 +45,7 @@ public final class HyfeUtils implements AutoCloseable {
         this.animatedTitles = new AnimatedTitleService(audiences, text, new SchedulerService(plugin));
         this.chat = new ChatService(audiences, text);
         this.clickableText = new ClickableTextService(audiences, text);
+        this.bossBar = new BossBarService(audiences, text);
         this.scheduler = new SchedulerService(plugin);
         this.events = new EventService(plugin);
         this.configuration = new ConfigurationService(plugin);
@@ -61,6 +64,7 @@ public final class HyfeUtils implements AutoCloseable {
     public AnimatedTitleService animatedTitles() { return animatedTitles; }
     public ChatService chat() { return chat; }
     public ClickableTextService clickableText() { return clickableText; }
+    public BossBarService bossBar() { return bossBar; }
     public SchedulerService scheduler() { return scheduler; }
     public EventService events() { return events; }
     public ConfigurationService config() { return configuration; }

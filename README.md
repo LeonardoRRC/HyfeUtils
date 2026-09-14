@@ -345,6 +345,74 @@ hyfe.scheduler().cancelAll(); // cancela todo de golpe
 
 ---
 
+### BossBar
+
+**Sin HyfeUtils (NMS/Adventure manual en 1.8.8):**
+```java
+// Necesitas detectar versión, crear boss bar manualmente
+// y manejar packets o usar API de Bukkit (solo 1.9+)
+import net.kyori.adventure.bossbar.BossBar;
+import net.kyori.adventure.platform.bukkit.BukkitAudiences;
+
+// Crear audiences (necesitas manage manualmente)
+BukkitAudiences audiences = BukkitAudiences.create(plugin);
+
+// Crear boss bar
+BossBar bossBar = BossBar.bossBar(
+    Component.text("§6§lBoss"),
+    1.0f,
+    BossBar.Color.PINK,
+    BossBar.Overlay.PROGRESS,
+    java.util.EnumSet.noneOf(BossBar.Flag.class)
+);
+
+// Mostrar
+audiences.player(player).showBossBar(bossBar);
+
+// Actualizar progreso
+bossBar.progress(0.5f);
+
+// Cambiar color (requiere recrear)
+BossBar newBar = BossBar.bossBar(
+    Component.text("§c§lFase 2"),
+    0.75f,
+    BossBar.Color.RED,
+    BossBar.Overlay.PROGRESS,
+    java.util.EnumSet.noneOf(BossBar.Flag.class)
+);
+audiences.player(player).hideBossBar(bossBar);
+audiences.player(player).showBossBar(newBar);
+
+// Ocultar
+audiences.player(player).hideBossBar(newBar);
+```
+
+**Con HyfeUtils:**
+```java
+// Crear y mostrar en una línea
+hyfe.bossBar().builder()
+    .name("&6&lBoss")
+    .color("RED")
+    .progress(1.0f)
+    .show(player);
+
+// Actualizar progreso dinámicamente
+BossBar bar = hyfe.bossBar().builder()
+    .name("&6&l¡Ronda 3!")
+    .color(BossBar.Color.GREEN)
+    .progress(0.75f)
+    .build();
+hyfe.bossBar().show(player, bar);
+
+bar.progress(0.5f);
+bar.name(Component.text("§c§l¡Última fase!"));
+
+// Ocultar
+hyfe.bossBar().hide(player, bar);
+```
+
+---
+
 ## Mensajes
 
 Todos los métodos aceptan `CommandSender`, por lo que funcionan con jugadores,
@@ -472,6 +540,85 @@ hyfe.animatedTitles().animate(player,
 El efecto ola funciona aplicando dos colores alternados por carácter y
 desplazando el patrón cada frame para crear el efecto de movimiento.
 
+## BossBar
+
+Las BossBar funcionan en **todas las versiones** incluyendo 1.8.8. Usa el builder
+fluent para configurar colores, estilos y progreso:
+
+```java
+BossBar bar = hyfe.bossBar().builder()
+    .name("&6&l¡BOSS!")
+    .color("RED")
+    .overlay("NOTCHED_12")
+    .progress(1.0f)
+    .build();
+
+hyfe.bossBar().show(player, bar);
+```
+
+### Colores disponibles
+
+| Color     | Código       |
+|-----------|--------------|
+| `PINK`    | Por defecto  |
+| `BLUE`    | Azul         |
+| `GREEN`   | Verde        |
+| `YELLOW`  | Amarillo     |
+| `PURPLE`  | Morado       |
+| `WHITE`   | Blanco       |
+| `RED`     | Rojo         |
+
+### Estilos de barra
+
+| Estilo        | Descripción                        |
+|---------------|------------------------------------|
+| `PROGRESS`    | Barra sólida (por defecto)         |
+| `NOTCHED_6`   | Dividida en 6 segmentos            |
+| `NOTCHED_10`  | Dividida en 10 segmentos           |
+| `NOTCHED_12`  | Dividida en 12 segmentos           |
+| `NOTCHED_20`  | Dividida en 20 segmentos           |
+
+### Flags opcionales
+
+```java
+BossBar bar = hyfe.bossBar().builder()
+    .name("&c&l¡FASE FINAL!")
+    .color("RED")
+    .darkenScreen(true)      // Oscurece el cielo
+    .playBossMusic(true)     // Reproduce música de boss
+    .createWorldFog(true)    // Crea niebla
+    .build();
+```
+
+### Actualización dinámica
+
+El `BossBar` de Adventure permite modificar propiedades después de crearlo:
+
+```java
+BossBar bar = hyfe.bossBar().builder()
+    .name("&6&lRonda 1")
+    .color("GREEN")
+    .progress(1.0f)
+    .build();
+
+hyfe.bossBar().show(player, bar);
+
+// Actualizar progreso y nombre
+bar.progress(0.5f);
+bar.name(Component.text("§6§lRonda 2"));
+
+// Ocultar
+hyfe.bossBar().hide(player, bar);
+```
+
+### Soporte de versiones
+
+| Versión del servidor | Versión del cliente | Método usado           |
+|----------------------|---------------------|------------------------|
+| 1.8.8                | 1.8.x               | Con ViaVersion: paquetes |
+| 1.8.8                | 1.9+                | Paquetes ViaVersion    |
+| 1.9+                 | Cualquiera          | Bukkit API o Adventure |
+
 ## Scheduler
 
 Las tareas deben ejecutarse en el hilo principal cuando interactúan con Bukkit.
@@ -554,7 +701,7 @@ El repositorio público está disponible en
 <dependency>
     <groupId>com.github.LeonardoRRC</groupId>
     <artifactId>HyfeUtils</artifactId>
-    <version>1.0.2</version>
+    <version>1.0.3</version>
 </dependency>
 ```
 
