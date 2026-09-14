@@ -45,8 +45,8 @@ public final class HyfeUtils implements AutoCloseable {
         this.animatedTitles = new AnimatedTitleService(audiences, text, new SchedulerService(plugin));
         this.chat = new ChatService(audiences, text);
         this.clickableText = new ClickableTextService(audiences, text);
-        this.bossBar = new BossBarService(audiences, text);
         this.scheduler = new SchedulerService(plugin);
+        this.bossBar = new BossBarService(audiences, text, scheduler);
         this.events = new EventService(plugin);
         this.configuration = new ConfigurationService(plugin);
         this.commands = new CommandService(plugin);

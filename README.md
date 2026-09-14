@@ -611,6 +611,85 @@ bar.name(Component.text("§6§lRonda 2"));
 hyfe.bossBar().hide(player, bar);
 ```
 
+### Cronómetro (Timer)
+
+BossBar que reduce la vida gradualmente de 1.0 a 0.0 durante un tiempo determinado:
+
+```java
+// Cronómetro de 60 segundos
+hyfe.bossBar().timer()
+    .player(player)
+    .name("&c&lTiempo restante: &f60s")
+    .seconds(60)
+    .color("RED")
+    .onTick(progress -> {
+        // Actualizar nombre con tiempo restante
+        int secondsLeft = (int) (progress * 60);
+        bar.name(Component.text("§c§lTiempo: §f" + secondsLeft + "s"));
+    })
+    .onComplete(bar -> {
+        hyfe.messages().send(player, "&c¡Tiempo agotado!");
+    })
+    .start();
+
+// Cronómetro con TimeUnit
+hyfe.bossBar().timer()
+    .player(player)
+    .name("&6&lPreparación...")
+    .duration(30, java.util.concurrent.TimeUnit.SECONDS)
+    .color("YELLOW")
+    .onComplete(bar -> {
+        hyfe.messages().send(player, "&a¡Comienza la partida!");
+    })
+    .start();
+```
+
+### Efecto Ola (Wave)
+
+BossBar que oscila la vida entre un mínimo y máximo (estilo Hypixel):
+
+```java
+// Ola infinita - se detiene manualmente
+WaveHandle wave = hyfe.bossBar().wave()
+    .player(player)
+    .name("&d&lOla de enemigos")
+    .color("PURPLE")
+    .minProgress(0.2f)
+    .maxProgress(1.0f)
+    .speed(0.02f)
+    .onCycle(cycle -> {
+        hyfe.messages().send(player, "&d¡Ola " + cycle + " completada!");
+    })
+    .start();
+
+// Detener la ola después de un tiempo
+hyfe.scheduler().runLater(600L, () -> wave.stop());
+
+// Ola con 5 ciclos y auto-stop
+hyfe.bossBar().wave()
+    .player(player)
+    .name("&c&lFase de boss")
+    .color("RED")
+    .minProgress(0.3f)
+    .maxProgress(1.0f)
+    .speed(0.03f)
+    .cycles(5)
+    .onCycle(cycle -> {
+        hyfe.messages().send(player, "&eCiclo " + cycle + "/5");
+    })
+    .onStop(() -> {
+        hyfe.messages().send(player, "&a¡Fase completada!");
+    })
+    .start();
+```
+
+### Detener BossBars
+
+```java
+// Cancelar todos los timers y waves activos
+hyfe.bossBar().cancelAll();
+```
+
 ### Soporte de versiones
 
 | Versión del servidor | Versión del cliente | Método usado           |
@@ -701,7 +780,7 @@ El repositorio público está disponible en
 <dependency>
     <groupId>com.github.LeonardoRRC</groupId>
     <artifactId>HyfeUtils</artifactId>
-    <version>1.0.3</version>
+    <version>1.0.4</version>
 </dependency>
 ```
 
