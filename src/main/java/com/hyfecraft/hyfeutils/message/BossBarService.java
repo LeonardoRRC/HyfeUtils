@@ -76,6 +76,7 @@ public final class BossBarService {
         private Consumer<BossBar> onComplete;
         private Consumer<Float> onTick;
         private boolean autoHide = true;
+        private long tickInterval = 1L;
 
         TimerBossBarBuilder(BukkitAudiences audiences, TextService text,
                             SchedulerService scheduler, Map<Integer, BukkitTask> activeTasks) {
@@ -150,6 +151,12 @@ public final class BossBarService {
             return this;
         }
 
+        /** How often the bar updates. Default 1 (every tick). Use 20 for once per second. */
+        public TimerBossBarBuilder tickInterval(long ticks) {
+            this.tickInterval = Math.max(1L, ticks);
+            return this;
+        }
+
         /**
          * Starts the timer and returns the BossBar for external control.
          * The bar starts full (1.0) and decreases to 0.0 over the specified duration.
@@ -167,14 +174,15 @@ public final class BossBarService {
             audiences.player(player).showBossBar(bar);
 
             final float startProgress = 1.0f;
-            final float decrement = startProgress / (float) durationTicks;
+            final long totalUpdates = durationTicks / tickInterval;
+            final float decrement = startProgress / (float) Math.max(1, totalUpdates);
             final int taskId = player.getUniqueId().hashCode();
 
             // Cancel any existing timer for this player
             BukkitTask existing = activeTasks.remove(taskId);
             if (existing != null) existing.cancel();
 
-            BukkitTask task = scheduler.runRepeating(1L, 1L, () -> {
+            BukkitTask task = scheduler.runRepeating(tickInterval, tickInterval, () -> {
                 if (!player.isOnline()) {
                     cancel();
                     return;
