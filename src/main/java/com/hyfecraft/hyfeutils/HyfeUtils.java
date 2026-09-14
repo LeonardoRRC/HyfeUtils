@@ -3,11 +3,14 @@ package com.hyfecraft.hyfeutils;
 import com.hyfecraft.hyfeutils.command.CommandService;
 import com.hyfecraft.hyfeutils.config.ConfigurationService;
 import com.hyfecraft.hyfeutils.event.EventService;
+import com.hyfecraft.hyfeutils.message.AnimatedTitleService;
 import com.hyfecraft.hyfeutils.message.ActionBarService;
+import com.hyfecraft.hyfeutils.message.ChatService;
 import com.hyfecraft.hyfeutils.message.MessageService;
 import com.hyfecraft.hyfeutils.message.TitleService;
 import com.hyfecraft.hyfeutils.log.LogService;
 import com.hyfecraft.hyfeutils.scheduler.SchedulerService;
+import com.hyfecraft.hyfeutils.text.ClickableTextService;
 import com.hyfecraft.hyfeutils.text.TextService;
 import net.kyori.adventure.platform.bukkit.BukkitAudiences;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -21,6 +24,9 @@ public final class HyfeUtils implements AutoCloseable {
     private final MessageService messages;
     private final ActionBarService actionBar;
     private final TitleService titles;
+    private final AnimatedTitleService animatedTitles;
+    private final ChatService chat;
+    private final ClickableTextService clickableText;
     private final SchedulerService scheduler;
     private final EventService events;
     private final ConfigurationService configuration;
@@ -34,6 +40,9 @@ public final class HyfeUtils implements AutoCloseable {
         this.messages = new MessageService(audiences, text);
         this.actionBar = new ActionBarService(audiences, text);
         this.titles = new TitleService(audiences, text);
+        this.animatedTitles = new AnimatedTitleService(audiences, text, new SchedulerService(plugin));
+        this.chat = new ChatService(audiences, text);
+        this.clickableText = new ClickableTextService(audiences, text);
         this.scheduler = new SchedulerService(plugin);
         this.events = new EventService(plugin);
         this.configuration = new ConfigurationService(plugin);
@@ -49,6 +58,9 @@ public final class HyfeUtils implements AutoCloseable {
     public MessageService messages() { return messages; }
     public ActionBarService actionBar() { return actionBar; }
     public TitleService titles() { return titles; }
+    public AnimatedTitleService animatedTitles() { return animatedTitles; }
+    public ChatService chat() { return chat; }
+    public ClickableTextService clickableText() { return clickableText; }
     public SchedulerService scheduler() { return scheduler; }
     public EventService events() { return events; }
     public ConfigurationService config() { return configuration; }

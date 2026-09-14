@@ -51,6 +51,57 @@ hyfe.messages().send(sender, "&cNo tienes permiso.");
 hyfe.messages().send(getServer().getConsoleSender(), "&eServidor iniciado");
 ```
 
+### Mensajes centrados
+
+Los mensajes se centran automáticamente en el chat (176 píxeles de ancho)
+usando la tabla de font metrics de Minecraft:
+
+```java
+hyfe.chat().sendCentered(player, "&6&lMCLANS");
+hyfe.chat().sendCentered(player, "&7Bienvenido al servidor");
+hyfe.chat().sendCentered(sender, "&eRanking de clanes");
+```
+
+### Textos clickeables
+
+Construye mensajes con acciones de clic y hover usando Adventure:
+
+```java
+import static com.hyfecraft.hyfeutils.text.ClickableTextService.clickable;
+
+// Ejecutar comando al hacer clic
+hyfe.clickableText().send(player,
+    clickable("&a[Info] &7Haz clic para ver tu clan")
+        .runCommand("/clan info")
+        .hoverText("&eClic para información")
+        .build()
+);
+
+// Sugerir comando
+hyfe.clickableText().send(player,
+    clickable "&b[Escribir] &7Haz clic para escribir")
+        .suggestCommand("/clan ")
+        .hoverText("&7Escribe un comando de clan")
+        .build()
+);
+
+// Abrir enlace
+hyfe.clickableText().send(player,
+    clickable "&6[Web] &7Visita nuestra web")
+        .openUrl("https://example.com")
+        .hoverText "&eAbrir en el navegador")
+        .build()
+);
+
+// Copiar al portapapeles
+hyfe.clickableText().send(player,
+    clickable "&e[IP] &7Clic para copiar la IP")
+        .copyToClipboard("play.example.com")
+        .hoverText("&7Clic para copiar")
+        .build()
+);
+```
+
 Para obtener solo el texto convertido:
 
 ```java
@@ -71,6 +122,50 @@ hyfe.titles().send(player,
 
 hyfe.actionBar().send(player, "&7Vida: &c" + player.getHealth());
 ```
+
+### Títulos animados
+
+Efecto ola con dos colores que se alternan por carácter:
+
+```java
+// Ola simple: color base &6 (dorado), color de ola &f (blanco)
+hyfe.animatedTitles().wave(player,
+    "&6&l¡COMIENZA LA PARTIDA!",
+    "&f&l",   // color de ola
+    60,       // duración total en ticks (3 segundos)
+    3         // delay entre frames (ticks)
+);
+
+// Ola con subtitle
+hyfe.animatedTitles().waveWithSubtitle(player,
+    "&6&l¡COMIENZA!",
+    "&7Prepárate para luchar",
+    "&f&l",
+    60, 3
+);
+
+// Rainbow wave (arcoíris automático)
+hyfe.animatedTitles().rainbowWave(player,
+    "&l¡PARTIDA!",
+    80, 3
+);
+
+// Rainbow wave con subtitle
+hyfe.animatedTitles().rainbowWaveWithSubtitle(player,
+    "&l¡PARTIDA!",
+    "&7Modo supervivencia",
+    80, 3
+);
+
+// Animación con frames personalizados
+hyfe.animatedTitles().animate(player,
+    List.of("&4Frame 1", "&6Frame 2", "&aFrame 3"),
+    60  // ticks totales
+);
+```
+
+El efecto ola funciona aplicando dos colores alternados por carácter y
+desplazando el patrón cada frame para crear el efecto de movimiento.
 
 ## Scheduler
 
@@ -154,11 +249,11 @@ El repositorio público está disponible en
 <dependency>
     <groupId>com.github.LeonardoRRC</groupId>
     <artifactId>HyfeUtils</artifactId>
-    <version>1.0.1</version>
+    <version>1.0.2</version>
 </dependency>
 ```
 
-También puede usarse una etiqueta concreta, por ejemplo `1.0.1`, para evitar
+También puede usarse una etiqueta concreta, por ejemplo `1.0.2`, para evitar
 que una compilación futura cambie el comportamiento de un plugin existente.
 
 ## Maven y shading
@@ -171,7 +266,7 @@ plugins:
 <dependency>
     <groupId>com.hyfecraft</groupId>
     <artifactId>hyfe-utils</artifactId>
-    <version>1.0.1</version>
+    <version>1.0.2</version>
 </dependency>
 ```
 
