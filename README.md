@@ -31,14 +31,319 @@ public final class ExamplePlugin extends JavaPlugin {
 }
 ```
 
+Los formatos `&a` y `&#RRGGBB` son compatibles. En clientes 1.16 o superiores
+se utiliza RGB; en clientes antiguos se selecciona el color legacy más cercano.
+
+## Comparación: sin HyfeUtils vs con HyfeUtils
+
+### Mensajes con colores
+
+**Sin HyfeUtils:**
 ```java
-hyfe.messages().send(player, "&7Bienvenido &#12ABEF" + player.getName());
-hyfe.actionBar().send(player, "&#00FFAA¡Objetivo completado!");
+// Necesitas detectar si es Player para obtener protocolo
+// y manejar colores manualmente
+if (player instanceof Player) {
+    Player p = (Player) player;
+    int protocol = -1;
+    try {
+        Class<?> via = Class.forName("com.viaversion.viaversion.api.Via");
+        Object api = via.getMethod("getAPI").invoke(null);
+        Method method = api.getClass().getMethod("getPlayerVersion", UUID.class);
+        protocol = (int) method.invoke(api, p.getUniqueId());
+    } catch (Exception ignored) {}
+    
+    // Convertir colores manualmente...
+    String msg = message.replace("&0", "\u00a70")
+        .replace("&1", "\u00a71")
+        .replace("&2", "\u00a72")
+        // ... 15+ líneas más de reemplazos
+        .replace("&#", "\u00a7x");
+    
+    p.sendMessage(msg);
+}
+```
+
+**Con HyfeUtils:**
+```java
+hyfe.messages().send(player, "&aHola &#FF0000Mundo");
+```
+
+---
+
+### Títulos
+
+**Sin HyfeUtils:**
+```java
+// Necesitas verificar el protocolo del cliente
+// y construir los componentes manualmente
+int protocol = -1;
+try {
+    Class<?> via = Class.forName("com.viaversion.viaversion.api.Via");
+    Object api = via.getMethod("getAPI").invoke(null);
+    Method m = api.getClass().getMethod("getPlayerVersion", UUID.class);
+    protocol = (int) m.invoke(api, player.getUniqueId());
+} catch (Exception ignored) {}
+
+String titleColorized = colorize("&#FFAA00Victoria", protocol);
+String subColorized = colorize("&fHas ganado", protocol);
+
+Component title = LegacyComponentSerializer.legacySection().deserialize(titleColorized);
+Component subtitle = LegacyComponentSerializer.legacySection().deserialize(subColorized);
+
+Title.Times times = Title.Times.times(
+    Duration.ofMillis(200),
+    Duration.ofMillis(1000),
+    Duration.ofMillis(200)
+);
+
+player.showTitle(Title.title(title, subtitle, times));
+```
+
+**Con HyfeUtils:**
+```java
 hyfe.titles().send(player, "&#FFAA00Victoria", "&fHas ganado", 10, 40, 10);
 ```
 
-Los formatos `&a` y `&#RRGGBB` son compatibles. En clientes 1.16 o superiores
-se utiliza RGB; en clientes antiguos se selecciona el color legacy más cercano.
+---
+
+### Textos clickeables
+
+**Sin HyfeUtils (código manual con Adventure):**
+```java
+Component text = Component.text()
+    .content("Click aquí")
+    .color(NamedTextColor.GREEN)
+    .clickEvent(ClickEvent.clickEvent(ClickEvent.Action.RUN_COMMAND, "/clan info"))
+    .hoverEvent(HoverEvent.hoverEvent(HoverEvent.Action.SHOW_TEXT,
+        Component.text("Ver tu clan").color(NamedTextColor.YELLOW)))
+    .build();
+
+// También necesitas crear unAudience
+BukkitAudiences audiences = BukkitAudiences.create(plugin);
+audiences.player(player).sendMessage(text);
+```
+
+**Con HyfeUtils:**
+```java
+import static com.hyfecraft.hyfeutils.text.ClickableTextService.clickable;
+
+hyfe.clickableText().send(player,
+    clickable("&aClick aquí")
+        .runCommand("/clan info")
+        .hoverText("&eVer tu clan")
+        .build()
+);
+```
+
+---
+
+### Títulos animados (efecto ola)
+
+**Sin HyfeUtils:**
+```java
+String text = "¡COMIENZA!";
+String baseColor = "\u00a76\u00a7l";
+String waveColor = "\u00a7f\u00a7l";
+String[] rainbow = {"\u00a7c", "\u00a76", "\u00a7e", "\u00a7a", "\u00a7b", "\u00a79", "\u00a7d"};
+
+int[] offset = {0};
+BukkitTask task = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+    if (!player.isOnline()) {
+        cancel();
+        return;
+    }
+    
+    StringBuilder wave = new StringBuilder();
+    for (int i = 0; i < text.length(); i++) {
+        char c = text.charAt(i);
+        if (c == ' ') {
+            wave.append(' ');
+            continue;
+        }
+        boolean useWave = (i + offset[0]) % 2 == 0;
+        wave.append(useWave ? waveColor : baseColor);
+        wave.append(c);
+    }
+    
+    Component main = LegacyComponentSerializer.legacySection()
+        .deserialize(wave.toString());
+    Component sub = Component.empty();
+    Title.Times times = Title.Times.times(
+        Duration.ZERO, Duration.ofMillis(100), Duration.ZERO);
+    player.showTitle(Title.title(main, sub, times));
+    
+    offset[0]++;
+}, 0L, 3L);
+```
+
+**Con HyfeUtils:**
+```java
+hyfe.animatedTitles().wave(player,
+    "&6&l¡COMIENZA!",
+    "&f&l",
+    60, 3
+);
+```
+
+---
+
+### Mensajes centrados
+
+**Sin HyfeUtils:**
+```java
+// Tabla de font metrics manual
+int CHAT_WIDTH = 176;
+Map<Character, Integer> widths = new HashMap<>();
+widths.put('A', 6); widths.put('B', 6); // ... 90+ líneas de mapa
+widths.put(' ', 4);
+
+String message = colorize("&6&lMCLANS");
+int msgWidth = 0;
+for (char c : message.toCharArray()) {
+    if (c == '\u00a7') continue;
+    msgWidth += widths.getOrDefault(c, 6);
+}
+
+int padding = (CHAT_WIDTH - msgWidth) / 2;
+StringBuilder centered = new StringBuilder("\u00a7r");
+while (getStringWidth(centered.toString()) < padding) {
+    centered.append(' ');
+}
+centered.append(message);
+player.sendMessage(centered.toString());
+```
+
+**Con HyfeUtils:**
+```java
+hyfe.chat().sendCentered(player, "&6&lMCLANS");
+```
+
+---
+
+### Eventos
+
+**Sin HyfeUtils:**
+```java
+public class MyListener implements Listener {
+    private final MyPlugin plugin;
+    
+    public MyListener(MyPlugin plugin) {
+        this.plugin = plugin;
+    }
+    
+    @EventHandler
+    public void onJoin(PlayerJoinEvent event) {
+        Player player = event.getPlayer();
+        player.sendMessage(colorize("&aBienvenido " + player.getName()));
+    }
+}
+
+// En onEnable:
+getServer().getPluginManager().registerEvents(new MyListener(this), this);
+```
+
+**Con HyfeUtils:**
+```java
+hyfe.events().listen(PlayerJoinEvent.class,
+    event -> hyfe.messages().send(event.getPlayer(), "&aBienvenido"));
+```
+
+---
+
+### Comandos
+
+**Sin HyfeUtils:**
+```java
+// En onEnable:
+getCommand("clan").setExecutor(new CommandExecutor() {
+    @Override
+    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        sender.sendMessage(colorize("&aHola"));
+        return true;
+    }
+});
+getCommand("clan").setTabCompleter(new TabCompleter() {
+    @Override
+    public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
+        return Arrays.asList("create", "delete", "info");
+    }
+});
+```
+
+**Con HyfeUtils:**
+```java
+hyfe.commands().bind("clan",
+    (sender, cmd, label, args) -> { hyfe.messages().send(sender, "&aHola"); return true; },
+    (sender, cmd, alias, args) -> Arrays.asList("create", "delete", "info")
+);
+```
+
+---
+
+### Configuración
+
+**Sin HyfeUtils:**
+```java
+// Cargar config
+File dataFolder = getDataFolder();
+if (!dataFolder.exists()) {
+    dataFolder.mkdirs();
+}
+File configFile = new File(dataFolder, "config.yml");
+if (!configFile.exists()) {
+    saveResource("config.yml", false);
+}
+FileConfiguration config = YamlConfiguration.loadConfiguration(configFile);
+String message = config.getString("messages.welcome", "&aBienvenido");
+
+// Guardar config
+try {
+    config.save(configFile);
+} catch (IOException e) {
+    e.printStackTrace();
+}
+```
+
+**Con HyfeUtils:**
+```java
+FileConfiguration config = hyfe.config().load("config.yml");
+String message = config.getString("messages.welcome", "&aBienvenido");
+hyfe.config().save(config, "config.yml");
+```
+
+---
+
+### Scheduler con limpieza automática
+
+**Sin HyfeUtils:**
+```java
+private final List<BukkitTask> tasks = new ArrayList<>();
+
+// En onEnable:
+tasks.add(Bukkit.getScheduler().runTaskTimer(this, () -> {
+    // lógica
+}, 0L, 20L));
+
+tasks.add(Bukkit.getScheduler().runTaskTimerAsynchronously(this, () -> {
+    // lógica async
+}, 0L, 100L));
+
+// En onDisable - debes recordar cancelar cada tarea
+for (BukkitTask task : tasks) {
+    task.cancel();
+}
+```
+
+**Con HyfeUtils:**
+```java
+hyfe.scheduler().runRepeating(0L, 20L, () -> { /* lógica */ });
+hyfe.scheduler().runRepeatingAsync(0L, 100L, () -> { /* async */ });
+
+// En onDisable:
+hyfe.scheduler().cancelAll(); // cancela todo de golpe
+```
+
+---
 
 ## Mensajes
 
@@ -79,7 +384,7 @@ hyfe.clickableText().send(player,
 
 // Sugerir comando
 hyfe.clickableText().send(player,
-    clickable "&b[Escribir] &7Haz clic para escribir")
+    clickable("&b[Escribir] &7Haz clic para escribir")
         .suggestCommand("/clan ")
         .hoverText("&7Escribe un comando de clan")
         .build()
@@ -87,15 +392,15 @@ hyfe.clickableText().send(player,
 
 // Abrir enlace
 hyfe.clickableText().send(player,
-    clickable "&6[Web] &7Visita nuestra web")
+    clickable("&6[Web] &7Visita nuestra web")
         .openUrl("https://example.com")
-        .hoverText "&eAbrir en el navegador")
+        .hoverText("&eAbrir en el navegador")
         .build()
 );
 
 // Copiar al portapapeles
 hyfe.clickableText().send(player,
-    clickable "&e[IP] &7Clic para copiar la IP")
+    clickable("&e[IP] &7Clic para copiar la IP")
         .copyToClipboard("play.example.com")
         .hoverText("&7Clic para copiar")
         .build()
