@@ -6,7 +6,7 @@
 
     <groupId>com.hyfecraft</groupId>
     <artifactId>hyfe-utils</artifactId>
-    <version>1.0.4</version>
+    <version>1.1.0</version>
     <packaging>jar</packaging>
 
     <name>HyfeUtils</name>
@@ -15,7 +15,8 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.release>17</maven.compiler.release>
-        <adventure.version>4.3.4</adventure.version>
+        <adventure.platform.version>4.4.1</adventure.platform.version>
+        <adventure.version>4.21.0</adventure.version>
     </properties>
 
     <repositories>
@@ -47,6 +48,16 @@
         <dependency>
             <groupId>net.kyori</groupId>
             <artifactId>adventure-platform-bukkit</artifactId>
+            <version>${adventure.platform.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>net.kyori</groupId>
+            <artifactId>adventure-text-minimessage</artifactId>
+            <version>${adventure.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>net.kyori</groupId>
+            <artifactId>adventure-text-serializer-plain</artifactId>
             <version>${adventure.version}</version>
         </dependency>
         <dependency>

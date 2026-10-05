@@ -8,7 +8,9 @@ deben sombrearse en el jar final.
 
 - Java 17.
 - Servidor Bukkit compatible desde 1.8.8.
-- ViaVersion recomendado para detectar la versión del cliente y entregar RGB.
+- ViaVersion 4.x o 5.x (opcional) **instalado en el mismo servidor Bukkit** para
+  entregar RGB, bossbars con estilo y demás funciones nuevas a clientes modernos
+  en servidores antiguos.
 
 ## Uso
 
@@ -31,8 +33,108 @@ public final class ExamplePlugin extends JavaPlugin {
 }
 ```
 
-Los formatos `&a` y `&#RRGGBB` son compatibles. En clientes 1.16 o superiores
-se utiliza RGB; en clientes antiguos se selecciona el color legacy más cercano.
+Todos los textos aceptan **MiniMessage y códigos legacy mezclados** en el mismo
+string: `&a`, `&l`, `&#RRGGBB`, `#RRGGBB`, `&x&R&R&G&G&B&B` (formato Spigot),
+`<red>`, `<#ff8800>`, `<gradient>`, `<rainbow>`, `<click>`, `<hover>`, etc.
+En clientes 1.16 o superiores se muestra el RGB real; en clientes antiguos se
+selecciona automáticamente el color legacy más cercano.
+
+```java
+hyfe.messages().send(player, "&aHola <gradient:#ff0000:#0000ff>mundo</gradient> &#12ABEFRGB");
+```
+
+## Novedades en 1.1.0
+
+- **MiniMessage** en todos los métodos que reciben `String`, con placeholders
+  (`TagResolver`) y caché de textos ya parseados.
+- **Cross-version real con ViaVersion 5**: RGB, degradados, títulos, actionbar,
+  tablist y bossbars con color/estilo llegan a clientes 1.9+/1.16+ aunque el
+  servidor sea 1.8.8 (ver [Compatibilidad entre versiones](#compatibilidad-entre-versiones)).
+- Métodos nuevos: `broadcast`, envío a listas de jugadores (se parsea una sola
+  vez), `send(sender, Component)`, `titles().clear/reset`, `tabList()`,
+  `chat().sendCentered(player, List)`, `bossBar().show(players, bar)`,
+  `timer().nameFormat(...)`, `overlay(String)` en timer y wave, `text().toLegacy(...)`.
+- Corregido: las animaciones de títulos ahora se detienen tras `totalTicks`
+  (antes se repetían para siempre) y devuelven la `BukkitTask` para cancelarlas.
+- El centrado de mensajes tiene en cuenta el texto en negrita.
+
+Cambios a revisar al actualizar desde 1.0.x: los métodos de `animatedTitles()`
+devuelven `BukkitTask` en lugar de `void`, `bossBar().builder().show(player)`
+devuelve la `BossBar` creada y los constructores públicos de los servicios
+reciben un `Dispatcher` (solo afecta si los creabas a mano en vez de usar
+`HyfeUtils.create`).
+
+## Compatibilidad entre versiones
+
+Un servidor 1.8.8 no puede representar colores RGB ni bossbars en sus propios
+paquetes: su sistema de chat no tiene colores hex y la 1.8 no tiene paquete de
+bossbar (Adventure la emula con un wither invisible). Por eso, aunque ViaVersion
+traduzca los paquetes, el RGB y los estilos ya se perdieron antes de llegar a él.
+
+Adventure incluye un puente para ViaVersion que soluciona esto, pero **solo se
+activa con ViaVersion 4**; con ViaVersion 5 se desactiva en silencio y los
+clientes nuevos reciben colores aproximados y la bossbar del wither.
+
+HyfeUtils trae su propio puente (`hyfe.via()`), compatible con ViaVersion 4 y 5.
+Escribe los paquetes directamente en el formato de la versión que introdujo la
+función y los inyecta en el pipeline de ViaVersion, que los convierte para la
+versión exacta del cliente:
+
+| Cliente   | Chat, actionbar, títulos, tablist | BossBar                                   |
+|-----------|-----------------------------------|-------------------------------------------|
+| 1.8.x     | Servidor (colores legacy)         | Servidor (wither)                         |
+| 1.9–1.15  | Servidor (color más cercano)      | **ViaVersion**: color, estilo y flags     |
+| 1.16+     | **ViaVersion**: RGB completo      | **ViaVersion**: RGB, color, estilo, flags |
+
+En servidores 1.16+ todo se envía de forma nativa. No hay que hacer nada
+especial: los mismos métodos funcionan en todos los casos.
+
+```java
+int protocol = hyfe.via().protocol(player);      // -1 si ViaVersion no está
+boolean rgb = hyfe.via().supportsRgb(player);
+boolean puente = hyfe.via().isPresent();
+```
+
+> ViaVersion debe estar en el servidor Bukkit. Si solo está en el proxy
+> (BungeeCord/Velocity), el servidor 1.8 no puede enviar RGB.
+
+Para usar el puente con tus propios componentes de Adventure:
+
+```java
+hyfe.dispatcher().message(player, Component.text("Hola", TextColor.color(0x12ABEF)));
+hyfe.dispatcher().showBossBar(player, miBossBar);
+```
+
+## MiniMessage
+
+```java
+import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
+
+// Placeholders seguros: el nombre del jugador no puede inyectar etiquetas
+hyfe.messages().send(player, "<gray>Bienvenido, <gold><player></gold>!",
+        Placeholder.unparsed("player", player.getName()));
+
+// Click y hover sin builder
+hyfe.messages().send(player,
+        "<click:run_command:/spawn><hover:show_text:'&eIr al spawn'>&a[Spawn]</hover></click>");
+
+// Degradados y arcoíris
+hyfe.messages().send(player, "<gradient:#ff5555:#5555ff>Texto con degradado</gradient>");
+hyfe.messages().send(player, "<rainbow>Arcoíris</rainbow>");
+
+// Texto escrito por jugadores: solo códigos &, sin etiquetas
+Component seguro = hyfe.text().legacy(mensajeDelJugador);
+```
+
+Utilidades de `hyfe.text()`:
+
+```java
+Component c = hyfe.text().parse("&aHola <bold>mundo");      // MiniMessage + legacy
+String mm = hyfe.text().toMiniMessage("&aHola &#FF0000rojo"); // "<green>Hola <#FF0000>rojo"
+String plano = hyfe.text().plain("&aHola <bold>mundo");      // "Hola mundo"
+String lore = hyfe.text().toLegacy("<gradient:red:blue>Item", protocol); // para ItemMeta, scoreboards
+hyfe.text().clearCache(); // tras recargar la configuración
+```
 
 ## Comparación: sin HyfeUtils vs con HyfeUtils
 
@@ -422,6 +524,14 @@ la consola y comandos remotos:
 hyfe.messages().send(player, "&aHola, &f" + player.getName());
 hyfe.messages().send(sender, "&cNo tienes permiso.");
 hyfe.messages().send(getServer().getConsoleSender(), "&eServidor iniciado");
+
+// Varias líneas
+hyfe.messages().send(player, config.getStringList("messages.help"));
+
+// A todos (se parsea una sola vez)
+hyfe.messages().broadcast("<gold>¡Evento iniciado!");
+hyfe.messages().broadcastWithPermission("staff.alerts", "&c[Staff] &fAlerta");
+hyfe.messages().send(teamPlayers, "&b[Equipo] &fListos");
 ```
 
 ### Mensajes centrados
@@ -494,6 +604,20 @@ hyfe.titles().send(player,
         10, 60, 10);
 
 hyfe.actionBar().send(player, "&7Vida: &c" + player.getHealth());
+
+hyfe.titles().send(player, "<gradient:gold:yellow>Victoria</gradient>", "&fHas ganado"); // tiempos vanilla
+hyfe.titles().broadcast("&c&lFIN", "&7Gracias por jugar", 10, 60, 10);
+hyfe.titles().clear(player);
+```
+
+## Tablist
+
+```java
+hyfe.tabList().send(player,
+        "<gradient:#00aaff:#00ffaa><bold>MI SERVIDOR</bold></gradient>",
+        "&7Jugadores: &f" + Bukkit.getOnlinePlayers().size());
+
+hyfe.tabList().send(player, List.of("&bLínea 1", "&3Línea 2"), List.of("&7play.example.com"));
 ```
 
 ### Títulos animados
@@ -538,12 +662,22 @@ hyfe.animatedTitles().animate(player,
 ```
 
 El efecto ola funciona aplicando dos colores alternados por carácter y
-desplazando el patrón cada frame para crear el efecto de movimiento.
+desplazando el patrón cada frame para crear el efecto de movimiento. Acepta
+colores hex y MiniMessage (`"<#ffffff><bold>"`). Todas las animaciones se
+detienen solas al llegar a `totalTicks` y devuelven la tarea para cancelarlas
+antes:
+
+```java
+BukkitTask anim = hyfe.animatedTitles().rainbowWave(player, "&l¡PARTIDA!", 80, 3);
+anim.cancel();
+```
 
 ## BossBar
 
-Las BossBar funcionan en **todas las versiones** incluyendo 1.8.8. Usa el builder
-fluent para configurar colores, estilos y progreso:
+Las BossBar funcionan en **todas las versiones** incluyendo 1.8.8. Con
+ViaVersion en un servidor 1.8.8, los clientes 1.9+ reciben una bossbar real con
+su color, estilo y flags (y RGB en 1.16+). Usa el builder fluent para configurar
+colores, estilos y progreso:
 
 ```java
 BossBar bar = hyfe.bossBar().builder()
@@ -605,7 +739,10 @@ hyfe.bossBar().show(player, bar);
 
 // Actualizar progreso y nombre
 bar.progress(0.5f);
-bar.name(Component.text("§6§lRonda 2"));
+hyfe.bossBar().rename(bar, "<gradient:gold:red><bold>Ronda 2</bold></gradient>");
+
+// La misma barra para varios jugadores
+hyfe.bossBar().show(Bukkit.getOnlinePlayers(), bar);
 
 // Ocultar
 hyfe.bossBar().hide(player, bar);
@@ -616,17 +753,13 @@ hyfe.bossBar().hide(player, bar);
 BossBar que reduce la vida gradualmente de 1.0 a 0.0 durante un tiempo determinado:
 
 ```java
-// Cronómetro de 60 segundos
+// Cronómetro de 60 segundos con el tiempo restante en el nombre
 hyfe.bossBar().timer()
     .player(player)
-    .name("&c&lTiempo restante: &f60s")
+    .nameFormat(seconds -> "&c&lTiempo restante: &f" + seconds + "s")
     .seconds(60)
     .color("RED")
-    .onTick(progress -> {
-        // Actualizar nombre con tiempo restante
-        int secondsLeft = (int) (progress * 60);
-        bar.name(Component.text("§c§lTiempo: §f" + secondsLeft + "s"));
-    })
+    .overlay("NOTCHED_20")
     .onComplete(bar -> {
         hyfe.messages().send(player, "&c¡Tiempo agotado!");
     })
@@ -692,11 +825,12 @@ hyfe.bossBar().cancelAll();
 
 ### Soporte de versiones
 
-| Versión del servidor | Versión del cliente | Método usado           |
-|----------------------|---------------------|------------------------|
-| 1.8.8                | 1.8.x               | Con ViaVersion: paquetes |
-| 1.8.8                | 1.9+                | Paquetes ViaVersion    |
-| 1.9+                 | Cualquiera          | Bukkit API o Adventure |
+| Versión del servidor | Versión del cliente | Método usado                         |
+|----------------------|---------------------|--------------------------------------|
+| 1.8.8                | 1.8.x               | Adventure (wither)                   |
+| 1.8.8 + ViaVersion   | 1.9–1.15            | Paquetes ViaVersion (color y estilo) |
+| 1.8.8 + ViaVersion   | 1.16+               | Paquetes ViaVersion (también RGB)    |
+| 1.9+                 | Cualquiera          | Adventure nativo                     |
 
 ## Scheduler
 
@@ -780,7 +914,7 @@ El repositorio público está disponible en
 <dependency>
     <groupId>com.github.LeonardoRRC</groupId>
     <artifactId>HyfeUtils</artifactId>
-    <version>1.0.4</version>
+    <version>1.1.0</version>
 </dependency>
 ```
 
@@ -797,12 +931,13 @@ plugins:
 <dependency>
     <groupId>com.hyfecraft</groupId>
     <artifactId>hyfe-utils</artifactId>
-    <version>1.0.2</version>
+    <version>1.1.0</version>
 </dependency>
 ```
 
-Relocaliza al menos `net.kyori` a un paquete propio del plugin huésped. Spigot
-API y ViaVersion no deben sombrearse.
+Relocaliza al menos `net.kyori` (incluye MiniMessage) a un paquete propio del
+plugin huésped. Spigot API y ViaVersion no deben sombrearse: HyfeUtils accede a
+ViaVersion por reflexión, así que no necesitas añadirlo como dependencia.
 
 Ejemplo de configuración para el `pom.xml` del plugin huésped:
 

@@ -1,34 +1,60 @@
 package com.hyfecraft.hyfeutils.message;
 
+import com.hyfecraft.hyfeutils.platform.Dispatcher;
 import com.hyfecraft.hyfeutils.text.TextService;
-import net.kyori.adventure.platform.bukkit.BukkitAudiences;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
-import net.kyori.adventure.title.Title;
+import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
-import java.time.Duration;
 import java.util.Objects;
 
+/** Titles. Times are in ticks (20 ticks = 1 second). */
 public final class TitleService {
-    private final BukkitAudiences audiences;
+    private final Dispatcher dispatcher;
     private final TextService text;
 
-    public TitleService(BukkitAudiences audiences, TextService text) {
-        this.audiences = audiences;
-        this.text = text;
+    public TitleService(Dispatcher dispatcher, TextService text) {
+        this.dispatcher = Objects.requireNonNull(dispatcher, "dispatcher");
+        this.text = Objects.requireNonNull(text, "text");
     }
 
     public void send(Player player, String title, String subtitle, int fadeIn, int stay, int fadeOut) {
-        Objects.requireNonNull(player, "player");
-        int protocol = ClientProtocol.get(player);
-        Component main = component(text.colorize(title, protocol));
-        Component sub = component(text.colorize(subtitle, protocol));
-        Title.Times times = Title.Times.times(Duration.ofMillis(fadeIn * 50L), Duration.ofMillis(stay * 50L), Duration.ofMillis(fadeOut * 50L));
-        audiences.player(player).showTitle(Title.title(main, sub, times));
+        send(player, text.parse(title), text.parse(subtitle), fadeIn, stay, fadeOut);
     }
 
-    private Component component(String value) {
-        return LegacyComponentSerializer.legacySection().deserialize(value == null ? "" : value);
+    /** Uses the vanilla times: 10 ticks fade in, 70 ticks stay and 20 ticks fade out. */
+    public void send(Player player, String title, String subtitle) {
+        send(player, title, subtitle, 10, 70, 20);
+    }
+
+    public void send(Player player, Component title, Component subtitle, int fadeIn, int stay, int fadeOut) {
+        Objects.requireNonNull(player, "player");
+        dispatcher.title(player,
+                title == null ? Component.empty() : title,
+                subtitle == null ? Component.empty() : subtitle,
+                fadeIn, stay, fadeOut);
+    }
+
+    /** Parses the title once and shows it to every player. */
+    public void send(Iterable<? extends Player> players, String title, String subtitle, int fadeIn, int stay, int fadeOut) {
+        Component main = text.parse(title);
+        Component sub = text.parse(subtitle);
+        for (Player player : players) {
+            send(player, main, sub, fadeIn, stay, fadeOut);
+        }
+    }
+
+    public void broadcast(String title, String subtitle, int fadeIn, int stay, int fadeOut) {
+        send(Bukkit.getOnlinePlayers(), title, subtitle, fadeIn, stay, fadeOut);
+    }
+
+    /** Hides the current title. */
+    public void clear(Player player) {
+        dispatcher.clearTitle(player);
+    }
+
+    /** Hides the current title and restores the default times. */
+    public void reset(Player player) {
+        dispatcher.resetTitle(player);
     }
 }

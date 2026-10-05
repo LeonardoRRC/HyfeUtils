@@ -1,55 +1,92 @@
 package com.hyfecraft.hyfeutils.message;
 
+import com.hyfecraft.hyfeutils.platform.Dispatcher;
 import com.hyfecraft.hyfeutils.scheduler.SchedulerService;
 import com.hyfecraft.hyfeutils.text.TextService;
-import net.kyori.adventure.audience.Audience;
 import net.kyori.adventure.bossbar.BossBar;
-import net.kyori.adventure.platform.bukkit.BukkitAudiences;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
+import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.util.Arrays;
 import java.util.EnumSet;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
-import java.util.function.DoubleConsumer;
-import java.util.function.LongConsumer;
+import java.util.function.IntFunction;
 
 public final class BossBarService {
-    private final BukkitAudiences audiences;
+    private final Dispatcher dispatcher;
     private final TextService text;
     private final SchedulerService scheduler;
     private final Map<Integer, BukkitTask> activeTasks = new ConcurrentHashMap<>();
 
-    public BossBarService(BukkitAudiences audiences, TextService text, SchedulerService scheduler) {
-        this.audiences = Objects.requireNonNull(audiences, "audiences");
+    public BossBarService(Dispatcher dispatcher, TextService text, SchedulerService scheduler) {
+        this.dispatcher = Objects.requireNonNull(dispatcher, "dispatcher");
         this.text = Objects.requireNonNull(text, "text");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
     }
 
     public BossBarBuilder builder() {
-        return new BossBarBuilder(audiences, text);
+        return new BossBarBuilder(dispatcher, text);
     }
 
     public TimerBossBarBuilder timer() {
-        return new TimerBossBarBuilder(audiences, text, scheduler, activeTasks);
+        return new TimerBossBarBuilder(dispatcher, text, scheduler, activeTasks);
     }
 
     public WaveBossBarBuilder wave() {
-        return new WaveBossBarBuilder(audiences, text, scheduler, activeTasks);
+        return new WaveBossBarBuilder(dispatcher, text, scheduler, activeTasks);
     }
 
     public void show(Player player, BossBar bossBar) {
-        audiences.player(player).showBossBar(bossBar);
+        dispatcher.showBossBar(player, bossBar);
     }
 
     public void hide(Player player, BossBar bossBar) {
-        audiences.player(player).hideBossBar(bossBar);
+        dispatcher.hideBossBar(player, bossBar);
+    }
+
+    /** Shows the same bar to several players. Updates to the bar reach all of them. */
+    public void show(Iterable<? extends Player> players, BossBar bossBar) {
+        for (Player player : players) {
+            dispatcher.showBossBar(player, bossBar);
+        }
+    }
+
+    public void hide(Iterable<? extends Player> players, BossBar bossBar) {
+        for (Player player : players) {
+            dispatcher.hideBossBar(player, bossBar);
+        }
+    }
+
+    /** Changes the name of a bar using MiniMessage or legacy codes. */
+    public void rename(BossBar bossBar, String name) {
+        bossBar.name(text.parse(name));
+    }
+
+    /** Accepts names like {@code "red"}, {@code "RED"}; unknown values return {@code fallback}. */
+    public static BossBar.Color parseColor(String name, BossBar.Color fallback) {
+        if (name == null) return fallback;
+        String key = name.trim().toUpperCase(Locale.ROOT).replace(' ', '_');
+        for (BossBar.Color color : BossBar.Color.values()) {
+            if (color.name().equals(key)) return color;
+        }
+        return fallback;
+    }
+
+    /** Accepts {@code "NOTCHED_12"}, {@code "notched 12"} or just {@code "12"}; unknown values return {@code fallback}. */
+    public static BossBar.Overlay parseOverlay(String name, BossBar.Overlay fallback) {
+        if (name == null) return fallback;
+        String key = name.trim().toUpperCase(Locale.ROOT).replace(' ', '_');
+        for (BossBar.Overlay overlay : BossBar.Overlay.values()) {
+            if (overlay.name().equals(key) || overlay.name().equals("NOTCHED_" + key)) return overlay;
+        }
+        return fallback;
     }
 
     public void cancelAll() {
@@ -62,7 +99,7 @@ public final class BossBarService {
     // ------------------------------------------------------------------
 
     public static final class TimerBossBarBuilder {
-        private final BukkitAudiences audiences;
+        private final Dispatcher dispatcher;
         private final TextService text;
         private final SchedulerService scheduler;
         private final Map<Integer, BukkitTask> activeTasks;
@@ -77,10 +114,11 @@ public final class BossBarService {
         private Consumer<Float> onTick;
         private boolean autoHide = true;
         private long tickInterval = 1L;
+        private IntFunction<String> nameFormat;
 
-        TimerBossBarBuilder(BukkitAudiences audiences, TextService text,
+        TimerBossBarBuilder(Dispatcher dispatcher, TextService text,
                             SchedulerService scheduler, Map<Integer, BukkitTask> activeTasks) {
-            this.audiences = audiences;
+            this.dispatcher = dispatcher;
             this.text = text;
             this.scheduler = scheduler;
             this.activeTasks = activeTasks;
@@ -92,12 +130,21 @@ public final class BossBarService {
         }
 
         public TimerBossBarBuilder name(String name) {
-            this.name = LegacyComponentSerializer.legacySection().deserialize(text.colorize(name));
+            this.name = text.parse(name);
             return this;
         }
 
         public TimerBossBarBuilder name(Component name) {
             this.name = Objects.requireNonNull(name, "name");
+            return this;
+        }
+
+        /**
+         * Name recalculated with the remaining seconds, e.g.
+         * {@code nameFormat(s -> "&cTiempo: &f" + s + "s")}. Only re-sent when the second changes.
+         */
+        public TimerBossBarBuilder nameFormat(IntFunction<String> format) {
+            this.nameFormat = Objects.requireNonNull(format, "format");
             return this;
         }
 
@@ -122,12 +169,17 @@ public final class BossBarService {
         }
 
         public TimerBossBarBuilder color(String colorName) {
-            this.color = parseColor(colorName);
+            this.color = parseColor(colorName, this.color);
             return this;
         }
 
         public TimerBossBarBuilder overlay(BossBar.Overlay overlay) {
             this.overlay = Objects.requireNonNull(overlay, "overlay");
+            return this;
+        }
+
+        public TimerBossBarBuilder overlay(String overlayName) {
+            this.overlay = parseOverlay(overlayName, this.overlay);
             return this;
         }
 
@@ -167,15 +219,16 @@ public final class BossBarService {
                 throw new IllegalArgumentException("duration must be > 0");
             }
 
-            Component nameComponent = name != null ? name : Component.empty();
+            final int[] lastSeconds = {(int) Math.ceil(durationTicks / 20.0)};
+            Component nameComponent = nameFormat != null
+                    ? text.parse(nameFormat.apply(lastSeconds[0]))
+                    : name != null ? name : Component.empty();
             EnumSet<BossBar.Flag> flagSet = EnumSet.noneOf(BossBar.Flag.class);
             flagSet.addAll(Arrays.asList(flags));
             BossBar bar = BossBar.bossBar(nameComponent, 1.0f, color, overlay, flagSet);
-            audiences.player(player).showBossBar(bar);
+            dispatcher.showBossBar(player, bar);
 
-            final float startProgress = 1.0f;
-            final long totalUpdates = durationTicks / tickInterval;
-            final float decrement = startProgress / (float) Math.max(1, totalUpdates);
+            final long[] elapsed = {0L};
             final int taskId = player.getUniqueId().hashCode();
 
             // Cancel any existing timer for this player
@@ -187,9 +240,17 @@ public final class BossBarService {
                     cancel();
                     return;
                 }
-                float current = bar.progress();
-                float next = Math.max(0f, current - decrement);
+                elapsed[0] = Math.min(durationTicks, elapsed[0] + tickInterval);
+                float next = Math.max(0f, 1f - (float) elapsed[0] / durationTicks);
                 bar.progress(next);
+
+                if (nameFormat != null) {
+                    int seconds = (int) Math.ceil((durationTicks - elapsed[0]) / 20.0);
+                    if (seconds != lastSeconds[0]) {
+                        lastSeconds[0] = seconds;
+                        bar.name(text.parse(nameFormat.apply(seconds)));
+                    }
+                }
 
                 if (onTick != null) {
                     onTick.accept(next);
@@ -200,7 +261,7 @@ public final class BossBarService {
                         onComplete.accept(bar);
                     }
                     if (autoHide) {
-                        audiences.player(player).hideBossBar(bar);
+                        dispatcher.hideBossBar(player, bar);
                     }
                     cancel();
                 }
@@ -216,22 +277,6 @@ public final class BossBarService {
             if (task != null) task.cancel();
         }
 
-        private static BossBar.Color parseColor(String name) {
-            if (name == null) return BossBar.Color.RED;
-            try {
-                return BossBar.Color.valueOf(name.toUpperCase().replace(" ", "_"));
-            } catch (IllegalArgumentException e) {
-                return switch (name.toLowerCase().replace(" ", "")) {
-                    case "red" -> BossBar.Color.RED;
-                    case "blue" -> BossBar.Color.BLUE;
-                    case "green" -> BossBar.Color.GREEN;
-                    case "yellow" -> BossBar.Color.YELLOW;
-                    case "purple" -> BossBar.Color.PURPLE;
-                    case "white" -> BossBar.Color.WHITE;
-                    default -> BossBar.Color.RED;
-                };
-            }
-        }
     }
 
     // ------------------------------------------------------------------
@@ -239,7 +284,7 @@ public final class BossBarService {
     // ------------------------------------------------------------------
 
     public static final class WaveBossBarBuilder {
-        private final BukkitAudiences audiences;
+        private final Dispatcher dispatcher;
         private final TextService text;
         private final SchedulerService scheduler;
         private final Map<Integer, BukkitTask> activeTasks;
@@ -256,9 +301,9 @@ public final class BossBarService {
         private Consumer<Integer> onCycle;
         private Runnable onStop;
 
-        WaveBossBarBuilder(BukkitAudiences audiences, TextService text,
+        WaveBossBarBuilder(Dispatcher dispatcher, TextService text,
                            SchedulerService scheduler, Map<Integer, BukkitTask> activeTasks) {
-            this.audiences = audiences;
+            this.dispatcher = dispatcher;
             this.text = text;
             this.scheduler = scheduler;
             this.activeTasks = activeTasks;
@@ -270,7 +315,7 @@ public final class BossBarService {
         }
 
         public WaveBossBarBuilder name(String name) {
-            this.name = LegacyComponentSerializer.legacySection().deserialize(text.colorize(name));
+            this.name = text.parse(name);
             return this;
         }
 
@@ -307,12 +352,17 @@ public final class BossBarService {
         }
 
         public WaveBossBarBuilder color(String colorName) {
-            this.color = parseColor(colorName);
+            this.color = parseColor(colorName, this.color);
             return this;
         }
 
         public WaveBossBarBuilder overlay(BossBar.Overlay overlay) {
             this.overlay = Objects.requireNonNull(overlay, "overlay");
+            return this;
+        }
+
+        public WaveBossBarBuilder overlay(String overlayName) {
+            this.overlay = parseOverlay(overlayName, this.overlay);
             return this;
         }
 
@@ -344,7 +394,7 @@ public final class BossBarService {
             EnumSet<BossBar.Flag> flagSet = EnumSet.noneOf(BossBar.Flag.class);
             flagSet.addAll(Arrays.asList(flags));
             BossBar bar = BossBar.bossBar(nameComponent, maxProgress, color, overlay, flagSet);
-            audiences.player(player).showBossBar(bar);
+            dispatcher.showBossBar(player, bar);
 
             final int taskId = player.getUniqueId().hashCode() + "_wave".hashCode();
             final float mid = (minProgress + maxProgress) / 2f;
@@ -356,7 +406,7 @@ public final class BossBarService {
             BukkitTask existing = activeTasks.remove(taskId);
             if (existing != null) existing.cancel();
 
-            WaveHandle handle = new WaveHandle(activeTasks, taskId, audiences, player, bar, onStop);
+            WaveHandle handle = new WaveHandle(activeTasks, taskId, dispatcher, player, bar, onStop);
 
             BukkitTask task = scheduler.runRepeating(1L, 1L, () -> {
                 if (!player.isOnline()) {
@@ -390,22 +440,6 @@ public final class BossBarService {
             return handle;
         }
 
-        private static BossBar.Color parseColor(String name) {
-            if (name == null) return BossBar.Color.PURPLE;
-            try {
-                return BossBar.Color.valueOf(name.toUpperCase().replace(" ", "_"));
-            } catch (IllegalArgumentException e) {
-                return switch (name.toLowerCase().replace(" ", "")) {
-                    case "red" -> BossBar.Color.RED;
-                    case "blue" -> BossBar.Color.BLUE;
-                    case "green" -> BossBar.Color.GREEN;
-                    case "yellow" -> BossBar.Color.YELLOW;
-                    case "purple" -> BossBar.Color.PURPLE;
-                    case "white" -> BossBar.Color.WHITE;
-                    default -> BossBar.Color.PURPLE;
-                };
-            }
-        }
     }
 
     // ------------------------------------------------------------------
@@ -415,17 +449,17 @@ public final class BossBarService {
     public static final class WaveHandle {
         private final Map<Integer, BukkitTask> activeTasks;
         private final int taskId;
-        private final BukkitAudiences audiences;
+        private final Dispatcher dispatcher;
         private final Player player;
         private final BossBar bar;
         private final Runnable onStop;
         private volatile boolean stopped = false;
 
         WaveHandle(Map<Integer, BukkitTask> activeTasks, int taskId,
-                   BukkitAudiences audiences, Player player, BossBar bar, Runnable onStop) {
+                   Dispatcher dispatcher, Player player, BossBar bar, Runnable onStop) {
             this.activeTasks = activeTasks;
             this.taskId = taskId;
-            this.audiences = audiences;
+            this.dispatcher = dispatcher;
             this.player = player;
             this.bar = bar;
             this.onStop = onStop;
@@ -437,7 +471,7 @@ public final class BossBarService {
             BukkitTask task = activeTasks.remove(taskId);
             if (task != null) task.cancel();
             if (player.isOnline()) {
-                audiences.player(player).hideBossBar(bar);
+                dispatcher.hideBossBar(player, bar);
             }
             if (onStop != null) {
                 onStop.run();
@@ -454,11 +488,11 @@ public final class BossBarService {
     }
 
     // ------------------------------------------------------------------
-    //  Static BossBarBuilder (unchanged)
+    //  Static BossBarBuilder
     // ------------------------------------------------------------------
 
     public static final class BossBarBuilder {
-        private final BukkitAudiences audiences;
+        private final Dispatcher dispatcher;
         private final TextService text;
         private Component name;
         private float progress = 1.0f;
@@ -466,13 +500,18 @@ public final class BossBarService {
         private BossBar.Overlay overlay = BossBar.Overlay.PROGRESS;
         private final Set<BossBar.Flag> flags = EnumSet.noneOf(BossBar.Flag.class);
 
-        private BossBarBuilder(BukkitAudiences audiences, TextService text) {
-            this.audiences = audiences;
+        private BossBarBuilder(Dispatcher dispatcher, TextService text) {
+            this.dispatcher = dispatcher;
             this.text = text;
         }
 
         public BossBarBuilder name(String name) {
-            this.name = LegacyComponentSerializer.legacySection().deserialize(text.colorize(name));
+            this.name = text.parse(name);
+            return this;
+        }
+
+        public BossBarBuilder name(String name, TagResolver... placeholders) {
+            this.name = text.parse(name, placeholders);
             return this;
         }
 
@@ -492,7 +531,7 @@ public final class BossBarService {
         }
 
         public BossBarBuilder color(String colorName) {
-            this.color = parseColor(colorName);
+            this.color = parseColor(colorName, this.color);
             return this;
         }
 
@@ -502,7 +541,7 @@ public final class BossBarService {
         }
 
         public BossBarBuilder overlay(String overlayName) {
-            this.overlay = parseOverlay(overlayName);
+            this.overlay = parseOverlay(overlayName, this.overlay);
             return this;
         }
 
@@ -535,40 +574,12 @@ public final class BossBarService {
             return BossBar.bossBar(nameComponent, progress, color, overlay, EnumSet.copyOf(flags));
         }
 
-        public void show(Player player) {
-            audiences.player(player).showBossBar(build());
+        /** Builds the bar, shows it and returns it so it can be updated or hidden later. */
+        public BossBar show(Player player) {
+            BossBar bar = build();
+            dispatcher.showBossBar(player, bar);
+            return bar;
         }
 
-        private BossBar.Color parseColor(String name) {
-            if (name == null) return BossBar.Color.PINK;
-            try {
-                return BossBar.Color.valueOf(name.toUpperCase().replace(" ", "_"));
-            } catch (IllegalArgumentException e) {
-                return switch (name.toLowerCase().replace(" ", "")) {
-                    case "red" -> BossBar.Color.RED;
-                    case "blue" -> BossBar.Color.BLUE;
-                    case "green" -> BossBar.Color.GREEN;
-                    case "yellow" -> BossBar.Color.YELLOW;
-                    case "purple" -> BossBar.Color.PURPLE;
-                    case "white" -> BossBar.Color.WHITE;
-                    default -> BossBar.Color.PINK;
-                };
-            }
-        }
-
-        private BossBar.Overlay parseOverlay(String name) {
-            if (name == null) return BossBar.Overlay.PROGRESS;
-            try {
-                return BossBar.Overlay.valueOf(name.toUpperCase().replace(" ", "_"));
-            } catch (IllegalArgumentException e) {
-                return switch (name.toLowerCase().replace(" ", "")) {
-                    case "6" -> BossBar.Overlay.NOTCHED_6;
-                    case "10" -> BossBar.Overlay.NOTCHED_10;
-                    case "12" -> BossBar.Overlay.NOTCHED_12;
-                    case "20" -> BossBar.Overlay.NOTCHED_20;
-                    default -> BossBar.Overlay.PROGRESS;
-                };
-            }
-        }
     }
 }
